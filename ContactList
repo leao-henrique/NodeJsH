@@ -1,0 +1,171 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAX_CONTACTS 100
+#define REGISTRO_FILE "registro.bin"
+#define TEMP_FILE "temp.bin"
+
+typedef struct {
+    char name[50];
+    char phone[30];
+} Contact;
+
+void clearBuffer() {
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF);
+}
+
+void AddContact(FILE *file) {
+    Contact newContact;
+
+    printf("Nome: ");
+    if (!fgets(newContact.name, sizeof(newContact.name), stdin)) {
+        printf("Erro ao ler o nome.\n");
+        clearBuffer();
+        return;
+    }
+    newContact.name[strcspn(newContact.name, "\n")] = '\0'; 
+
+    printf("Telefone: ");
+    if (!fgets(newContact.phone, sizeof(newContact.phone), stdin)) {
+        printf("Erro ao ler o telefone.\n");
+        clearBuffer();
+        return;
+    }
+    newContact.phone[strcspn(newContact.phone, "\n")] = '\0';
+
+    // Escreve o contato no arquivo
+    if (fwrite(&newContact, sizeof(Contact), 1, file) != 1) {
+        printf("Erro ao adicionar o contato.\n");
+        clearBuffer();
+    } else {
+        printf("Contato adicionado com sucesso!\n");
+    }
+}
+
+void RemContact(FILE *file) {
+    Contact contact;
+    char con_contact[50];
+    FILE *tempFile;
+    int found = 0;
+
+    printf("Digite o nome do contato a remover: ");
+    if (!fgets(con_contact, sizeof(con_contact), stdin)) {
+        printf("Erro ao ler o nome do contato.\n");
+        clearBuffer();
+        return;
+    }
+    con_contact[strcspn(con_contact, "\n")] = '\0'; 
+
+    tempFile = fopen(TEMP_FILE, "wb");
+    if (!tempFile) {
+        printf("Erro ao criar arquivo temporário.\n");
+        return;
+    }
+
+    rewind(file);
+
+    while (fread(&contact, sizeof(Contact), 1, file) == 1) {
+        if (strcmp(contact.name, con_contact) != 0) {
+            if (fwrite(&contact, sizeof(Contact), 1, tempFile) != 1) {
+                printf("Erro ao escrever no arquivo temporario.\n");
+                fclose(tempFile);
+                remove(TEMP_FILE);
+                return;
+            }
+        } else {
+            found = 1;
+        }
+    }
+
+    fclose(file);
+    fclose(tempFile);
+
+    if (!found) {
+        printf("Contato nao encontrado.\n");
+        remove(TEMP_FILE);
+    } else {
+        remove(REGISTRO_FILE);
+        rename(TEMP_FILE, REGISTRO_FILE);
+        file = fopen(REGISTRO_FILE, "ab+");
+        if (!file) {
+            printf("Erro ao reabrir o arquivo.\n");
+        } else {
+            printf("Contato removido com sucesso!\n");
+        }
+    }
+}
+
+void SearchContact(FILE *file) {
+    Contact contact;
+    char search_contact[50];
+    int found = 0;
+
+    printf("Digite o nome do contato a consultar: ");
+    if (!fgets(search_contact, sizeof(search_contact), stdin)) {
+        printf("Erro ao ler o nome do contato.\n");
+        clearBuffer();
+        return;
+    }
+    search_contact[strcspn(search_contact, "\n")] = '\0'; 
+
+    rewind(file);
+
+    while (fread(&contact, sizeof(Contact), 1, file) == 1) {
+        if (strcmp(contact.name, search_contact) == 0) {
+            printf("\nContato encontrado:\n");
+            printf("Nome: %s\n", contact.name);
+            printf("Telefone: %s\n", contact.phone);
+            found = 1;
+            break;
+        }
+    }
+
+    if (!found) {
+        printf("Contato nao encontrado.\n");
+    }
+}
+
+int main() {
+    FILE *file = fopen(REGISTRO_FILE, "ab+");
+    if (!file) {
+        printf("Erro ao abrir o arquivo.\n");
+        return 1;
+    }
+
+    int opcao;
+
+    do {
+        printf("\n        MENU         \n");
+        printf("Opcao [ 1 ] - Adicionar um novo contato\n");
+        printf("Opcao [ 2 ] - Consultar um contato\n");
+        printf("Opcao [ 3 ] - Remover um contato\n");
+        printf("Opcao [ 4 ] - Sair da agenda\n");
+        printf("Escolha uma das opcoes: ");
+        scanf("%d", &opcao);
+        clearBuffer(); 
+
+        switch (opcao) {
+            case 1:
+                AddContact(file);
+                break;
+            case 2:
+                SearchContact(file);
+                break;
+            case 3:
+                RemContact(file);
+                break;
+            case 4:
+                printf("Saindo da Agenda.\n");
+                break;
+            default:
+                printf("Opcao invalida.\n");
+                break;
+        }
+    } while (opcao != 4);
+
+    fclose(file);
+
+    return 0;
+}
